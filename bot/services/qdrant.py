@@ -64,11 +64,18 @@ class QdrantService:
                 points=points
             )
 
-    async def search(self, query_vector: List[float], limit: int = 5) -> List[str]:
-        """Searches for similar chunks."""
+    async def search(
+        self,
+        query_vector: List[float],
+        limit: int = 5,
+        score_threshold: float = 0.0,
+    ) -> List[str]:
+        """Searches for similar chunks, dropping weak matches below threshold."""
         results = await self.client.search(
             collection_name=self.collection_name,
             query_vector=query_vector,
-            limit=limit
+            limit=limit,
+            # Let Qdrant filter weak matches server-side (0.0 => no filtering).
+            score_threshold=score_threshold or None,
         )
         return [hit.payload["text"] for hit in results]

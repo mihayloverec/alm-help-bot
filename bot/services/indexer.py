@@ -16,7 +16,9 @@ class IndexerService:
             doc_id=settings.GOOGLE_DOC_ID,
             credentials_json=settings.GOOGLE_SERVICE_ACCOUNT_JSON
         )
-        self.splitter = TextSplitter(chunk_size=3000, overlap=500)
+        # Smaller, clause-aligned chunks: each holds a coherent rule instead
+        # of a 3000-char window that smears across clause boundaries.
+        self.splitter = TextSplitter(chunk_size=1200, overlap=200)
 
     async def run_indexing(self):
         logger.info("Starting indexing process...")

@@ -67,7 +67,11 @@ async def handle_question(message: Message,
         # We now use retrieval again because we have "Fat Chunks" (3000 chars) that hold enough context.
         # This saves tokens compared to sending the whole 40k text.
         q_vector = await openai_svc.get_embedding(question)
-        relevant_chunks = await qdrant_svc.search(q_vector, limit=5)
+        relevant_chunks = await qdrant_svc.search(
+            q_vector,
+            limit=settings.SEARCH_LIMIT,
+            score_threshold=settings.SEARCH_SCORE_THRESHOLD,
+        )
 
         # 3. Generate Answer
         if not relevant_chunks:

@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     # Protects against oversized, expensive embedding/LLM requests.
     MAX_QUESTION_LENGTH: int = 1000
 
+    # RAG retrieval tuning.
+    # How many clause-sized chunks to feed the model as context.
+    SEARCH_LIMIT: int = 6
+    # Drop chunks whose cosine similarity is below this, so weak/irrelevant
+    # matches don't dilute the answer. 0.0 disables filtering.
+    SEARCH_SCORE_THRESHOLD: float = 0.3
+
     GOOGLE_DOC_ID: str
     GOOGLE_SERVICE_ACCOUNT_JSON: Optional[str] = None
 
