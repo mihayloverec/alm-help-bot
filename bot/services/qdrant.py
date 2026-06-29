@@ -9,6 +9,9 @@ class QdrantService:
             host=settings.QDRANT_HOST,
             port=settings.QDRANT_PORT,
             api_key=settings.QDRANT_API_KEY,  # None => no auth (unchanged)
+            # Passing api_key makes the client default to HTTPS, but Qdrant
+            # serves plain HTTP inside the Docker network — force it off.
+            https=False,
         )
         self.collection_name = "regulations"
         self.vector_size = 1536  # text-embedding-3-small dimension
