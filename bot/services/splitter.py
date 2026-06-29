@@ -6,6 +6,15 @@ from typing import List
 # Examples that match: "6.9.4 Оскорбление...", "6.10. Текст", "7) Текст".
 CLAUSE_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)[.)]?\s+\S")
 
+# Matches non-numeric section headings (appendices, chapters, etc.). These
+# also start a new section so e.g. "Приложение 1. Технические Фолы" is split
+# off from the preceding numbered clause instead of being glued to it.
+HEADING_RE = re.compile(r"^\s*(приложение|глава|раздел|часть|статья)\b", re.IGNORECASE)
+
+
+def _is_section_start(line: str) -> bool:
+    return bool(CLAUSE_RE.match(line) or HEADING_RE.match(line))
+
 
 class TextSplitter:
     """
@@ -42,12 +51,15 @@ class TextSplitter:
         current = ""
 
         for clause in clauses:
-            # A single clause larger than the budget is split on its own.
+            # A single clause/section larger than the budget is split on its
+            # own, repeating its heading in every piece so the topic (e.g.
+            # "Технические Фолы") stays attached to each list item.
             if len(clause) > self.chunk_size:
                 if current.strip():
                     chunks.append(current.strip())
                     current = ""
-                chunks.extend(self._split_by_chars(clause))
+                heading = self._section_heading(clause)
+                chunks.extend(self._split_by_chars(clause, heading=heading))
                 continue
 
             # Packing this clause would overflow → flush and start a new chunk
@@ -64,13 +76,13 @@ class TextSplitter:
         return [c for c in chunks if c.strip()]
 
     def _split_into_clauses(self, text: str) -> List[str]:
-        """Groups the text into clauses, each starting at a numbered heading."""
+        """Groups the text into sections, each starting at a clause or heading."""
         lines = text.splitlines()
         clauses: List[str] = []
         buf: List[str] = []
 
         for line in lines:
-            if CLAUSE_RE.match(line) and buf:
+            if _is_section_start(line) and buf:
                 clauses.append("\n".join(buf).strip())
                 buf = [line]
             else:
@@ -83,6 +95,18 @@ class TextSplitter:
 
         return [c for c in clauses if c]
 
+    def _section_heading(self, section: str) -> str:
+        """First line(s) of a section, used as a topic label on every piece."""
+        lines = [ln.strip() for ln in section.splitlines() if ln.strip()]
+        if not lines:
+            return ""
+        heading = lines[0]
+        # A bare label like "Приложение 1." carries little meaning on its own;
+        # append the next line (usually the descriptive title) for context.
+        if len(lines) > 1 and len(heading) < 40:
+            heading = f"{heading} {lines[1]}"
+        return heading[:160]
+
     def _overlap_tail(self, text: str) -> str:
         """Returns the last `overlap` chars of `text` (word-aligned) + newline."""
         if self.overlap <= 0 or len(text) <= self.overlap:
@@ -94,8 +118,14 @@ class TextSplitter:
             tail = tail[space + 1:]
         return tail.strip() + "\n"
 
-    def _split_by_chars(self, text: str) -> List[str]:
-        """Character-window split with word-boundary snapping (fallback)."""
+    def _split_by_chars(self, text: str, heading: str = "") -> List[str]:
+        """
+        Character-window split with word-boundary snapping.
+
+        When `heading` is given it is prepended to every piece after the first
+        (the first already begins with it), so each fragment of a long section
+        keeps its topic label for retrieval.
+        """
         if not text:
             return []
 
@@ -118,6 +148,8 @@ class TextSplitter:
 
             chunk = text[start:end].strip()
             if chunk:
+                if heading and chunks and not chunk.startswith(heading):
+                    chunk = f"{heading}\n{chunk}"
                 chunks.append(chunk)
 
             if end >= text_len:
