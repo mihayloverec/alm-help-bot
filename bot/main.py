@@ -9,6 +9,7 @@ from bot.services.openai_svc import OpenAIService
 from bot.services.qdrant import QdrantService
 from bot.services.cache import CacheService
 from bot.services.indexer import IndexerService
+from bot.middlewares.throttling import ThrottlingMiddleware
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +33,9 @@ async def main():
     dp["cache_svc"] = cache_svc
     dp["indexer"] = indexer_svc
     
+    # Anti-flood: limit how often a single user can trigger handlers.
+    dp.message.middleware(ThrottlingMiddleware(rate_limit=5, window=10.0))
+
     # Register Routers
     dp.include_router(admin.router)
     dp.include_router(user.router)

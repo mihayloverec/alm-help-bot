@@ -41,15 +41,19 @@ class TextSplitter:
             if chunk:
                 chunks.append(chunk)
 
-            # unexpected case: start didn't move
-            if end == start:
-                 break
-                 
-            start = start + self.chunk_size - self.overlap
-            
-            # Ensure we don't get stuck or go backwards if overlap is too big for a small remaining part
-            # effectively: next start must be at least start + 1 (unless done)
-            if start >= end:
-                 start = end  # Should not happen with valid chunk_size > overlap, but safe guard
+            # We've reached the end of the text.
+            if end >= text_len:
+                break
+
+            # Move the window forward based on the ACTUAL end of this chunk
+            # (which may have been pulled back to a word boundary), so the
+            # overlap stays consistent regardless of boundary adjustments.
+            next_start = end - self.overlap
+
+            # Safe guard: always make forward progress to avoid infinite loops.
+            if next_start <= start:
+                next_start = end
+
+            start = next_start
 
         return chunks

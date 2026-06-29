@@ -15,16 +15,27 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     restart: always
-    ports:
-      - "6333:6333"
+    # No public `ports:` mapping — Qdrant is reachable only from other
+    # services on the internal Docker network (the bot connects via host
+    # "qdrant"). Do NOT expose 6333 to the host unless you really need it;
+    # if you do, bind to localhost only: "127.0.0.1:6333:6333".
+    environment:
+      # When QDRANT_API_KEY is empty Qdrant runs without auth (unchanged
+      # behaviour). Set it in .env to require the key (defense in depth).
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
     volumes:
       - qdrant_data:/qdrant/storage
 
   redis:
     image: redis:alpine
     restart: always
-    ports:
-      - "6379:6379"
+    # No public `ports:` mapping — see the note above. Internal network only.
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    # Enable AOF persistence and, when REDIS_PASSWORD is set, require it.
+    # `$$` defers expansion to the container shell so the value is read from
+    # the container env at runtime (empty password => no auth, as before).
+    command: sh -c 'exec redis-server --appendonly yes $${REDIS_PASSWORD:+--requirepass "$$REDIS_PASSWORD"}'
     volumes:
       - redis_data:/data
 

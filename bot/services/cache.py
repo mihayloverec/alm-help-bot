@@ -5,8 +5,13 @@ import json
 
 class CacheService:
     def __init__(self):
-        self.redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        self.redis = redis.from_url(
+            settings.REDIS_URL,
+            password=settings.REDIS_PASSWORD,  # None => no auth (unchanged)
+            decode_responses=True,
+        )
         self.ttl = 60 * 60 * 24 * 7  # 1 week cache
+        self.log_max_len = 5000  # cap question_log so it can't grow unbounded
 
     def _get_key(self, question: str) -> str:
         # Normalize: lowercase, strip
@@ -31,7 +36,12 @@ class CacheService:
             "question": question,
             "answer": answer
         })
-        await self.redis.lpush("question_log", entry)
+        # Push then trim so the log keeps only the most recent N entries,
+        # preventing unbounded Redis memory growth.
+        pipe = self.redis.pipeline()
+        pipe.lpush("question_log", entry)
+        pipe.ltrim("question_log", 0, self.log_max_len - 1)
+        await pipe.execute()
 
     async def clear_all_answers(self):
         """Clears all cached answers."""

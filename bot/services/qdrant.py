@@ -7,7 +7,8 @@ class QdrantService:
     def __init__(self):
         self.client = AsyncQdrantClient(
             host=settings.QDRANT_HOST,
-            port=settings.QDRANT_PORT
+            port=settings.QDRANT_PORT,
+            api_key=settings.QDRANT_API_KEY,  # None => no auth (unchanged)
         )
         self.collection_name = "regulations"
         self.vector_size = 1536  # text-embedding-3-small dimension

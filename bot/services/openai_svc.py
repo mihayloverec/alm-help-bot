@@ -4,14 +4,20 @@ from typing import List
 
 class OpenAIService:
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model_chat = "gpt-4.1-mini"
+        # Embeddings go to OpenAI directly — OpenRouter has no embeddings endpoint.
+        self.embedding_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        # Chat completions are routed through OpenRouter (OpenAI-compatible API).
+        self.chat_client = AsyncOpenAI(
+            api_key=settings.OPENROUTER_API_KEY,
+            base_url=settings.OPENROUTER_BASE_URL,
+        )
+        self.model_chat = "openai/gpt-4.1-mini"
         self.model_embedding = "text-embedding-3-small"
 
     async def get_embedding(self, text: str) -> List[float]:
         """Generates embedding for the given text."""
         text = text.replace("\n", " ")
-        response = await self.client.embeddings.create(
+        response = await self.embedding_client.embeddings.create(
             input=[text],
             model=self.model_embedding
         )
@@ -22,7 +28,7 @@ class OpenAIService:
         # OpenAI has a limit on batch size, but for this scale it should be fine.
         # Clean newlines
         cleaned_texts = [t.replace("\n", " ") for t in texts]
-        response = await self.client.embeddings.create(
+        response = await self.embedding_client.embeddings.create(
             input=cleaned_texts,
             model=self.model_embedding
         )
@@ -52,7 +58,7 @@ class OpenAIService:
         
         user_prompt = f"Контекст регламента:\n{context_str}\n\nВопрос судьи:\n{question}"
 
-        response = await self.client.chat.completions.create(
+        response = await self.chat_client.chat.completions.create(
             model=self.model_chat,
             messages=[
                 {"role": "system", "content": system_prompt},
